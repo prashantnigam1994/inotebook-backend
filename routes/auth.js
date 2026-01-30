@@ -8,6 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const fetchuser = require('../middleware/fetchuser');
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
+const axios = require("axios");
 
 // Create a user via endpoint /api/user/createuser
 router.post('/createuser', [
@@ -121,21 +122,40 @@ router.post("/forgot/check-email", async (req, res) => {
 
 // Send OTP for users to verify mobile and provide authentication via endpoint /api/auth/forgot/send-otp
 router.post("/forgot/send-otp", async (req, res) => {
-    const { email, mobile } = req.body;
+    try {
+        const { email, mobile } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user) return res.json({ success: false });
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.json({ success: false, message: "User not found" });
+        }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        // Generate OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    user.resetOtp = otp;
-    user.resetOtpExpire = Date.now() + 10 * 60 * 1000;
-    await user.save();
+        // Save OTP temporarily
+        user.resetOtp = otp;
+        user.resetOtpExpire = Date.now() + 10 * 60 * 1000; // 10 mins
+        await user.save();
 
-    // TEMP: log OTP (replace with SMS gateway later)
-    console.log(`OTP for ${mobile}:`, otp);
+        // SEND SMS USING FAST2SMS
+        await axios.get("https://www.fast2sms.com/dev/bulkV2", {
+            headers: {
+                authorization: process.env.FAST2SMS_API_KEY
+            },
+            params: {
+                route: "otp",
+                variables_values: otp,
+                numbers: mobile
+            }
+        });
 
-    res.json({ success: true });
+        res.json({ success: true, message: "OTP sent successfully" });
+
+    } catch (error) {
+        console.error("Fast2SMS Error:", error.response?.data || error.message);
+        res.json({ success: false, message: "Failed to send OTP" });
+    }
 });
 
 // Verify OTP for users for authentication via endpoint /api/auth/forgot/send-otp
