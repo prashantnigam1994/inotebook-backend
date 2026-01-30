@@ -112,73 +112,46 @@ router.post('/getuser', fetchuser, async (req, res) => {
     }
 })
 
-// Forgot password option for users who have forgot their password via endpoint /api/auth/forgotpassword
-router.post("/forgotpassword", async (req, res) => {
-    try {
-        const frontendUrl = req.headers.origin;
-        const user = await User.findOne({ email: req.body.email });
-
-        if (!user) {
-            return res.json({ success: false });
-        }
-
-        const resetToken = crypto.randomBytes(32).toString("hex");
-
-        user.resetPasswordToken = crypto
-            .createHash("sha256")
-            .update(resetToken)
-            .digest("hex");
-
-        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-        await user.save();
-
-        const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
-
-        const message = `
-        You requested a password reset for your iNotebook account.
-
-        Click the link below to reset your password:
-        ${resetUrl}
-
-        This link will expire in 10 minutes.
-
-        If you did not request this, please ignore this email.
-        `;
-
-        await sendEmail({
-            email: user.email,
-            subject: "Password Reset - iNotebook",
-            message,
-        });
-
-        res.json({ success: true });
-    } catch (error) {
-        console.error(error);
-        console.log(error);
-        res.status(500).json({ success: false, error: error });
-    }
+// Forgot password option for users who have forgot their password via endpoint /api/auth/forgot/check-email
+router.post("/forgot/check-email", async (req, res) => {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) return res.json({ success: false });
+    res.json({ success: true });
 });
 
-router.post("/resetpassword/:token", async (req, res) => {
-    const resetPasswordToken = crypto
-        .createHash("sha256")
-        .update(req.params.token)
-        .digest("hex");
+// Send OTP for users to verify mobile and provide authentication via endpoint /api/auth/forgot/send-otp
+router.post("/forgot/send-otp", async (req, res) => {
+    const { email, mobile } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.json({ success: false });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    user.resetOtp = otp;
+    user.resetOtpExpire = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    // TEMP: log OTP (replace with SMS gateway later)
+    console.log(`OTP for ${mobile}:`, otp);
+
+    res.json({ success: true });
+});
+
+// Verify OTP for users for authentication via endpoint /api/auth/forgot/send-otp
+router.post("/forgot/verify-otp", async (req, res) => {
+    const { email, otp } = req.body;
 
     const user = await User.findOne({
-        resetPasswordToken,
-        resetPasswordExpire: { $gt: Date.now() },
+        email,
+        resetOtp: otp,
+        resetOtpExpire: { $gt: Date.now() }
     });
 
     if (!user) {
         return res.json({ success: false });
     }
 
-    user.password = bcrypt.hashSync(req.body.password, 10);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-
-    await user.save();
     res.json({ success: true });
 });
 
