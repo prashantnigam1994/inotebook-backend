@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET;
 const fetchuser = require('../middleware/fetchuser');
 const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail");
 
 // Create a user via endpoint /api/user/createuser
 router.post('/createuser', [
@@ -113,24 +114,48 @@ router.post('/getuser', fetchuser, async (req, res) => {
 
 // Forgot password option for users who have forgot their password via endpoint /api/auth/forgotpassword
 router.post("/forgotpassword", async (req, res) => {
-    const frontendUrl = req.headers.origin;
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) {
-        return res.json({ success: false });
+    try {
+        const frontendUrl = req.headers.origin;
+        const user = await User.findOne({ email: req.body.email });
+
+        if (!user) {
+            return res.json({ success: false });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString("hex");
+
+        user.resetPasswordToken = crypto
+            .createHash("sha256")
+            .update(resetToken)
+            .digest("hex");
+
+        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+        await user.save();
+
+        const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+        const message = `
+        You requested a password reset for your iNotebook account.
+
+        Click the link below to reset your password:
+        ${resetUrl}
+
+        This link will expire in 10 minutes.
+
+        If you did not request this, please ignore this email.
+        `;
+
+        await sendEmail({
+            email: user.email,
+            subject: "Password Reset - iNotebook",
+            message,
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false });
     }
-
-    const resetToken = crypto.randomBytes(32).toString("hex");
-
-    user.resetPasswordToken = crypto
-        .createHash("sha256")
-        .update(resetToken)
-        .digest("hex");
-
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 mins
-    await user.save();
-
-    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
-    res.json({ success: true });
 });
 
 router.post("/resetpassword/:token", async (req, res) => {
