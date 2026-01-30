@@ -154,7 +154,8 @@ router.post("/forgotpassword", async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false });
+        console.log(error);
+        res.status(500).json({ success: false, error: error });
     }
 });
 
