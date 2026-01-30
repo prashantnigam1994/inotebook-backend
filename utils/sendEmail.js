@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+require("dotenv").config();
 
 const sendEmail = async (options) => {
     const transporter = nodemailer.createTransport({
@@ -11,7 +12,7 @@ const sendEmail = async (options) => {
     });
 
     const mailOptions = {
-        from: `"iNotebook Support" <${process.env.EMAIL_USER}>`,
+        from: `"iNotebook Support" <prashantnigam094@gmail.com>`,
         to: options.email,
         subject: options.subject,
         text: options.message,
