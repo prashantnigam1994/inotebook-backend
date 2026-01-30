@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET;
 const fetchuser = require('../middleware/fetchuser');
+const crypto = require("crypto");
 
 // Create a user via endpoint /api/user/createuser
 router.post('/createuser', [
@@ -109,5 +110,50 @@ router.post('/getuser', fetchuser, async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 })
+
+// Forgot password option for users who have forgot their password via endpoint /api/auth/forgotpassword
+router.post("/forgotpassword", async (req, res) => {
+    const frontendUrl = req.headers.origin;
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+        return res.json({ success: false });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    user.resetPasswordToken = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 mins
+    await user.save();
+
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+    res.json({ success: true });
+});
+
+router.post("/resetpassword/:token", async (req, res) => {
+    const resetPasswordToken = crypto
+        .createHash("sha256")
+        .update(req.params.token)
+        .digest("hex");
+
+    const user = await User.findOne({
+        resetPasswordToken,
+        resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+        return res.json({ success: false });
+    }
+
+    user.password = bcrypt.hashSync(req.body.password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+    res.json({ success: true });
+});
 
 module.exports = router
