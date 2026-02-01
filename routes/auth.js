@@ -144,8 +144,9 @@ router.post("/forgot/send-otp", async (req, res) => {
                 authorization: process.env.FAST2SMS_API_KEY
             },
             params: {
-                route: "otp",
-                variables_values: otp,
+                route: "v3",
+                sender_id: "TXTIND",
+                message: `Your password reset OTP is ${otp}`,
                 numbers: mobile
             }
         });
