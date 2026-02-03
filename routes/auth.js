@@ -156,7 +156,7 @@ router.post("/forgot/send-otp", async (req, res) => {
     }
 });
 
-// Verify OTP for users for authentication via endpoint /api/auth/forgot/send-otp
+// Verify OTP for users for authentication via endpoint /api/auth/forgot/verify-otp
 router.post("/forgot/verify-otp", async (req, res) => {
     try {
         const { email, otp } = req.body;
