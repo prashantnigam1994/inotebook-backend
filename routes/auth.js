@@ -145,7 +145,7 @@ router.post("/forgot/send-otp", async (req, res) => {
         await sendEmail({
             email,
             subject: "Password Reset OTP",
-            message: `Your password reset OTP is ${otp}. This code is valid for 10 minutes.`
+            otp: otp
         });
 
         res.json({ success: true, message: "OTP sent to email" });
