@@ -145,7 +145,26 @@ router.post("/forgot/send-otp", async (req, res) => {
         await sendEmail({
             email,
             subject: "Password Reset OTP",
-            message: `Your password reset OTP is ${otp}. It is valid for 10 minutes.`
+            html: `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                    <p>Hello,</p>
+
+                    <p>We received a request to reset your <b>iNotebook</b> account password.</p>
+
+                    <p>Your one-time verification code is:</p>
+
+                    <h2 style="letter-spacing: 4px; color: #2c3e50;">
+                        ${otp}
+                    </h2>
+
+                    <p>This code is valid for <b>10 minutes</b>.</p>
+
+                    <p>If you did not request a password reset, you can safely ignore this email.</p>
+
+                    <br />
+                    <p>— iNotebook Support Team</p>
+                </div>
+            `
         });
 
         res.json({ success: true, message: "OTP sent to email" });
