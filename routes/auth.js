@@ -115,15 +115,19 @@ router.post('/getuser', fetchuser, async (req, res) => {
 
 // Forgot password option for users who have forgot their password via endpoint /api/auth/forgot/check-email
 router.post("/forgot/check-email", async (req, res) => {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user) return res.json({ success: false });
-    res.json({ success: true });
+    try {
+        const user = await User.findOne({ email: req.body.email });
+        if (!user) return res.json({ success: false });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false });
+    }
 });
 
 // Send OTP for users to verify mobile and provide authentication via endpoint /api/auth/forgot/send-otp
 router.post("/forgot/send-otp", async (req, res) => {
     try {
-        const { email, mobile } = req.body;
+        const { email } = req.body;
 
         const user = await User.findOne({ email });
         if (!user) {
@@ -133,47 +137,70 @@ router.post("/forgot/send-otp", async (req, res) => {
         // Generate OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Save OTP temporarily
         user.resetOtp = otp;
-        user.resetOtpExpire = Date.now() + 10 * 60 * 1000; // 10 mins
+        user.resetOtpExpire = Date.now() + 10 * 60 * 1000; // 10 min
         await user.save();
 
-        // SEND SMS USING FAST2SMS
-        await axios.get("https://www.fast2sms.com/dev/bulkV2", {
-            headers: {
-                authorization: process.env.FAST2SMS_API_KEY
-            },
-            params: {
-                route: "v3",
-                sender_id: "TXTIND",
-                message: `Your password reset OTP is ${otp}`,
-                numbers: mobile
-            }
+        // SEND EMAIL USING SENDGRID
+        await sendEmail({
+            email,
+            subject: "Password Reset OTP",
+            message: `Your password reset OTP is ${otp}. It is valid for 10 minutes.`
         });
 
-        res.json({ success: true, message: "OTP sent successfully" });
+        res.json({ success: true, message: "OTP sent to email" });
 
     } catch (error) {
-        console.error("Fast2SMS Error:", error.response?.data || error.message);
+        console.error("SendGrid Error:", error);
         res.json({ success: false, message: "Failed to send OTP" });
     }
 });
 
 // Verify OTP for users for authentication via endpoint /api/auth/forgot/send-otp
 router.post("/forgot/verify-otp", async (req, res) => {
-    const { email, otp } = req.body;
+    try {
+        const { email, otp } = req.body;
 
-    const user = await User.findOne({
-        email,
-        resetOtp: otp,
-        resetOtpExpire: { $gt: Date.now() }
-    });
+        const user = await User.findOne({
+            email,
+            resetOtp: otp,
+            resetOtpExpire: { $gt: Date.now() }
+        });
 
-    if (!user) {
-        return res.json({ success: false });
+        if (!user) {
+            return res.json({ success: false });
+        }
+
+        res.json({ success: true });
+
+    } catch (error) {
+        res.status(500).json({ success: false });
     }
+});
 
-    res.json({ success: true });
+// Reset password via endpoint /api/auth/forgot/reset-password
+router.post("/forgot/reset-password", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.json({ success: false });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+
+        user.resetOtp = undefined;
+        user.resetOtpExpire = undefined;
+
+        await user.save();
+
+        res.json({ success: true });
+
+    } catch (error) {
+        res.status(500).json({ success: false });
+    }
 });
 
 module.exports = router
