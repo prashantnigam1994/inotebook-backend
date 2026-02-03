@@ -4,11 +4,15 @@ require("dotenv").config();
 const sendEmail = async (options) => {
     const transporter = nodemailer.createTransport({
         host: "smtp.sendgrid.net",
-        port: 587,
+        port: 2525,
+        secure: false,
         auth: {
             user: "apikey",
             pass: process.env.SENDGRID_API_KEY,
         },
+        tls: {
+            rejectUnauthorized: false
+        }
     });
 
     const mailOptions = {
